@@ -1,0 +1,38 @@
+{
+  "name": "twilio-pg-transaction",
+  "version": "1.0.0",
+  "description": "A demo to show how database transaction works with Postgres and Twilio integration. Built with ExpressJS",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "nodemon index.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/DesmondSanctity/twilio-pg-transaction.git"
+  },
+  "keywords": [
+    "transaction",
+    "database",
+    "sql",
+    "postgres",
+    "twilio",
+    "api",
+    "expressjs"
+  ],
+  "author": "Desmond Obisi",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/DesmondSanctity/twilio-pg-transaction/issues"
+  },
+  "homepage": "https://github.com/DesmondSanctity/twilio-pg-transaction#readme",
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "express": "^4.19.2",
+    "nodemon": "^3.1.0",
+    "pg": "^8.11.5",
+    "twilio": "^5.0.4"
+  }
+}
