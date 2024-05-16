@@ -1,24 +1,23 @@
+import pg from 'pg';
 import express from 'express';
 import twilio from 'twilio';
 import bcrypt from 'bcryptjs';
 import dotenv from 'dotenv';
-import pg from 'pg';
+import { createTable } from './seed.js';
 
 dotenv.config();
 
 const { Pool } = pg;
-const pool = new Pool({
+export const pool = new Pool({
  user: process.env.DB_USER,
  host: process.env.DB_HOST,
  database: process.env.DB_NAME,
  password: process.env.DB_PASSWORD,
  port: process.env.DB_PORT,
- ssl: {
-  rejectUnauthorized: false,
- },
+ // ssl: {
+ //  rejectUnauthorized: false,
+ // },
 });
-
-const client = await pool.connect();
 
 const app = express();
 
@@ -30,15 +29,39 @@ const twilioClient = twilio(
  process.env.TWILIO_AUTH_TOKEN
 );
 
+// Check if users table exist
+const tableExists = async () => {
+ const client = await pool.connect();
+ try {
+  const res = await client.query(`SELECT EXISTS (
+      SELECT FROM information_schema.tables
+      WHERE table_name = 'users'
+    )`);
+  return res.rows[0].exists;
+ } catch (err) {
+  client.release();
+  console.error('Error checking table existence:', err);
+  return false;
+ }
+};
+
+// Create users table if it doesn't exist
+if (!(await tableExists())) {
+ console.log('Creating users table');
+ await createTable();
+} else {
+ console.log('Users table already exists');
+}
+
 // Helper function to send error response
-const sendError = (res, status, message) => {
- res.status(status).json({ error: message });
+const sendError = (res, status, message, err) => {
+ res.status(status).json({ error: message, errMessage: err });
 };
 
 // Signup route
 app.post('/signup', async (req, res) => {
  const { email, password } = req.body;
-
+ const client = await pool.connect();
  try {
   await client.query('BEGIN');
 
@@ -47,7 +70,7 @@ app.post('/signup', async (req, res) => {
   ]);
   if (result.rows.length > 0) {
    await client.query('ROLLBACK');
-   return sendError(res, 400, 'Email already exists');
+   return sendError(res, 400, 'Email already exists', null);
   }
 
   const hashedPassword = await bcrypt.hash(password, 10); // Replace with your password hashing library
@@ -58,29 +81,28 @@ app.post('/signup', async (req, res) => {
    [email, hashedPassword, otp]
   );
 
-  await client.query('COMMIT');
-
   await twilioClient.messages.create({
    body: `Your OTP for signup is ${otp}`,
-   from: process.env.TWILIO_PHONE_NUMBER,
+   from: `whatsapp:${process.env.TWILIO_PHONE_NUMBER}`,
    to: `whatsapp:${process.env.TEST_PHONE_NUMBER}`, // Replace with recipient phone number
   });
+
+  await client.query('COMMIT');
   res.json({ message: 'Signup successful, OTP sent to your phone' });
  } catch (err) {
   console.error(err);
   await client.query('ROLLBACK');
-  sendError(res, 500, 'Signup failed');
+  sendError(res, 500, 'Signup failed', err);
  } finally {
-  await client.release();
+  client.release();
  }
 });
 
 // Verify route
 app.post('/verify', async (req, res) => {
  const { email, code } = req.body;
-
+ const client = await pool.connect();
  try {
-  const client = await pool.getClient();
   await client.query('BEGIN');
 
   const result = await client.query('SELECT * FROM users WHERE email = $1', [
@@ -88,13 +110,13 @@ app.post('/verify', async (req, res) => {
   ]);
   if (!result.rows.length) {
    await client.query('ROLLBACK');
-   return sendError(res, 400, 'Invalid email');
+   return sendError(res, 400, 'Invalid email', null);
   }
 
   const user = result.rows[0];
   if (user.otp !== code) {
    await client.query('ROLLBACK');
-   return sendError(res, 400, 'Invalid OTP');
+   return sendError(res, 400, 'Invalid OTP', null);
   }
 
   await client.query(
@@ -107,7 +129,7 @@ app.post('/verify', async (req, res) => {
  } catch (err) {
   console.error(err);
   await client.query('ROLLBACK');
-  sendError(res, 500, 'Verification failed');
+  sendError(res, 500, 'Verification failed', err);
  } finally {
   client.release();
  }
@@ -116,13 +138,13 @@ app.post('/verify', async (req, res) => {
 // Login route (implement your logic to compare email and hashed password)
 app.post('/login', async (req, res) => {
  const { email, password } = req.body;
-
+ const client = await pool.connect();
  try {
   const result = await client.query('SELECT * FROM users WHERE email = $1', [
    email,
   ]);
   if (!result.rows.length) {
-   return sendError(res, 401, 'Invalid email or password');
+   return sendError(res, 401, 'Invalid email or password', null);
   }
 
   const user = result.rows[0];
@@ -131,14 +153,15 @@ app.post('/login', async (req, res) => {
   const isPasswordValid = await bcrypt.compare(password, user.password); // Placeholder logic
 
   if (!isPasswordValid) {
-   return sendError(res, 401, 'Invalid email or password');
+   return sendError(res, 401, 'Invalid email or password', null);
   }
 
   // Successful login logic (e.g., generate JWT token)
-  res.json({ message: 'Login successful', token: 'your_generated_token' }); // Placeholder token
+  user.password = null;
+  res.json({ message: 'Login successful', user }); // Placeholder token
  } catch (err) {
   console.error(err);
-  sendError(res, 500, 'Login failed');
+  sendError(res, 500, 'Login failed', err);
  } finally {
   client.release();
  }
