@@ -77,7 +77,7 @@ app.post('/signup', async (req, res) => {
   const otp = Math.floor(100000 + Math.random() * 900000); // Generate random OTP
 
   await client.query(
-   'INSERT INTO users (email, phone password, otp) VALUES ($1, $2, $3)',
+   'INSERT INTO users (email, phone, password, otp) VALUES ($1, $2, $3, $4)',
    [email, phone, hashedPassword, otp]
   );
 
