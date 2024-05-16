@@ -60,7 +60,7 @@ const sendError = (res, status, message, err) => {
 
 // Signup route
 app.post('/signup', async (req, res) => {
- const { email, password } = req.body;
+ const { email, phone, password } = req.body;
  const client = await pool.connect();
  try {
   await client.query('BEGIN');
@@ -77,14 +77,14 @@ app.post('/signup', async (req, res) => {
   const otp = Math.floor(100000 + Math.random() * 900000); // Generate random OTP
 
   await client.query(
-   'INSERT INTO users (email, password, otp) VALUES ($1, $2, $3)',
-   [email, hashedPassword, otp]
+   'INSERT INTO users (email, phone password, otp) VALUES ($1, $2, $3)',
+   [email, phone, hashedPassword, otp]
   );
 
   await twilioClient.messages.create({
    body: `Your OTP for signup is ${otp}`,
    from: `whatsapp:${process.env.TWILIO_PHONE_NUMBER}`,
-   to: `whatsapp:${process.env.TEST_PHONE_NUMBER}`, // Replace with recipient phone number
+   to: `whatsapp:${phone}`, // Replace with recipient phone number
   });
 
   await client.query('COMMIT');
