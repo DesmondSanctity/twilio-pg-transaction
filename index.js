@@ -74,18 +74,20 @@ app.post('/signup', async (req, res) => {
   }
 
   const hashedPassword = await bcrypt.hash(password, 10); // Replace with your password hashing library
-  const otp = Math.floor(100000 + Math.random() * 900000); // Generate random OTP
 
   await client.query(
-   'INSERT INTO users (email, phone, password, otp) VALUES ($1, $2, $3, $4)',
-   [email, phone, hashedPassword, otp]
+   'INSERT INTO users (email, phone, password) VALUES ($1, $2, $3)',
+   [email, phone, hashedPassword]
   );
 
-  await twilioClient.messages.create({
-   body: `Your OTP for signup is ${otp}`,
-   from: `whatsapp:${process.env.TWILIO_PHONE_NUMBER}`,
-   to: `whatsapp:${phone}`, // Replace with recipient phone number
-  });
+  const verify = await twilioClient.verify.v2
+   .services(process.env.TWILIO_MESSAGE_SID)
+   .verifications.create({
+    channel: 'whatsapp',
+    to: phone,
+   });
+
+  console.log(verify);
 
   await client.query('COMMIT');
   res.json({ message: 'Signup successful, OTP sent to your phone' });
@@ -100,29 +102,34 @@ app.post('/signup', async (req, res) => {
 
 // Verify route
 app.post('/verify', async (req, res) => {
- const { email, code } = req.body;
+ const { phone, code } = req.body;
  const client = await pool.connect();
  try {
   await client.query('BEGIN');
 
-  const result = await client.query('SELECT * FROM users WHERE email = $1', [
-   email,
+  const result = await client.query('SELECT * FROM users WHERE phone = $1', [
+   phone,
   ]);
   if (!result.rows.length) {
    await client.query('ROLLBACK');
    return sendError(res, 400, 'Invalid email', null);
   }
 
-  const user = result.rows[0];
-  if (user.otp !== code) {
+  const verificationCheck = await twilioClient.verify.v2
+   .services(process.env.TWILIO_MESSAGE_SID)
+   .verificationChecks.create({
+    code: code,
+    to: phone,
+   });
+
+  if (verificationCheck.status !== 'approved') {
    await client.query('ROLLBACK');
    return sendError(res, 400, 'Invalid OTP', null);
   }
 
-  await client.query(
-   'UPDATE users SET isVerified = true, otp = null WHERE email = $1',
-   [email]
-  );
+  await client.query('UPDATE users SET isVerified = true WHERE email = $1', [
+   email,
+  ]);
 
   await client.query('COMMIT');
   res.json({ message: 'Verification successful' });
