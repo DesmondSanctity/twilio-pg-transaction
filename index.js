@@ -83,7 +83,7 @@ app.post('/signup', async (req, res) => {
   const verify = await twilioClient.verify.v2
    .services(process.env.TWILIO_MESSAGE_SID)
    .verifications.create({
-    channel: 'whatsapp',
+    channel: 'sms',
     to: phone,
    });
 
@@ -112,7 +112,7 @@ app.post('/verify', async (req, res) => {
   ]);
   if (!result.rows.length) {
    await client.query('ROLLBACK');
-   return sendError(res, 400, 'Invalid email', null);
+   return sendError(res, 400, 'Invalid phone', null);
   }
 
   const verificationCheck = await twilioClient.verify.v2
@@ -127,8 +127,8 @@ app.post('/verify', async (req, res) => {
    return sendError(res, 400, 'Invalid OTP', null);
   }
 
-  await client.query('UPDATE users SET isVerified = true WHERE email = $1', [
-   email,
+  await client.query('UPDATE users SET isVerified = true WHERE phone = $1', [
+   phone,
   ]);
 
   await client.query('COMMIT');
