@@ -87,8 +87,6 @@ app.post('/signup', async (req, res) => {
     to: phone,
    });
 
-  console.log(verify);
-
   await client.query('COMMIT');
   res.json({ message: 'Signup successful, OTP sent to your phone' });
  } catch (err) {
