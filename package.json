@@ -30,7 +30,7 @@
   "homepage": "https://github.com/DesmondSanctity/twilio-pg-transaction#readme",
   "dependencies": {
     "bcryptjs": "^2.4.3",
-    "express": "^4.19.2",
+    "express": "^4.20.0",
     "nodemon": "^3.1.0",
     "pg": "^8.11.5",
     "twilio": "^5.0.4"
